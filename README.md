@@ -17,6 +17,21 @@ A free, browser-based certificate maker with a design engine that produces
 - Live preview; download as PNG or PDF (A4 landscape)
 - Fully client-side: uploads never leave the user's device; no server, no database
 
+## Bulk Certificates
+For large events, the Bulk Certificates section generates one certificate per
+recipient using the same category, design, logos and signature:
+- Import recipients from an Excel/CSV file (SheetJS; Name and Email columns
+  auto-detected), from a photo of a printed/handwritten list (Tesseract.js OCR),
+  or by pasting a list (one per line, optional "Name, email")
+- Editable review table (name + email, add/remove rows, recipient count)
+- Generates every certificate and downloads them as a single ZIP (JSZip),
+  one PNG per recipient, with live progress
+- Optional email sending via the organiser's own free EmailJS account
+  (Public Key / Service ID / Template ID stored only in the browser's
+  localStorage; the template needs an attachment variable named
+  `certificate_image` and uses `to_email` for the recipient). Without EmailJS,
+  per-person mailto "Compose" buttons are offered instead
+
 ## Run locally
 Open `index.html` in a browser, or serve the folder with any static server.
 

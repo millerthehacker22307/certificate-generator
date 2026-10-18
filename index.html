@@ -13,6 +13,10 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Playfair+Display:ital,wght@0,700;0,900;1,600&family=Great+Vibes&family=Poppins:wght@500;700;800&family=Montserrat:wght@500;700;800&family=Lora:ital,wght@0,500;0,700;1,500&family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://unpkg.com/@emailjs/browser@4/dist/email.min.js"></script>
 <style>
   :root{
     --navy:#12284b; --navy2:#0b1a33; --gold:#c9a227; --gold2:#e8c95a;
@@ -84,6 +88,27 @@
   .gitem .cap{font-size:11.5px;font-weight:700;color:var(--navy);text-align:center;padding:5px 4px;background:#fffdf7}
   footer{text-align:center;color:var(--muted);font-size:13px;margin-top:30px;line-height:1.6}
   .privacy{background:#eaf3ea;border:1px solid #bcd8bc;color:#2c542c;border-radius:10px;padding:10px 12px;font-size:13px;margin-top:14px;line-height:1.45}
+  /* ---- Bulk Certificates ---- */
+  .fullpanel{margin-top:20px}
+  .tablewrap{max-height:360px;overflow:auto;border:1px solid var(--line);border-radius:10px;background:#fffdf7;padding:2px 10px}
+  table.recip{width:100%;border-collapse:collapse;font-size:14px}
+  table.recip th{text-align:left;color:var(--navy);font-size:12px;text-transform:uppercase;letter-spacing:.06em;padding:9px 6px 7px;border-bottom:2px solid var(--gold2)}
+  table.recip td{padding:5px 6px;border-bottom:1px solid var(--line);vertical-align:middle}
+  table.recip input{width:100%;padding:8px 9px;border:1.2px solid var(--line);border-radius:8px;font-size:14px;font-family:inherit;background:#fff;color:var(--ink)}
+  table.recip input:focus{outline:2px solid var(--gold2);border-color:var(--gold)}
+  .iconbtn{border:1.5px solid var(--line);background:#fff;border-radius:8px;cursor:pointer;padding:6px 10px;font-size:13px;font-weight:700;color:var(--navy);white-space:nowrap}
+  .iconbtn:hover{border-color:var(--gold)}
+  .iconbtn.danger{color:#a52a3a}
+  a.iconbtn{text-decoration:none;display:inline-block}
+  .rowbtns{display:flex;gap:8px;flex-wrap:wrap}
+  .btn-sm{width:auto;padding:10px 16px;font-size:14px;margin-top:10px;display:inline-block}
+  .progress{height:12px;background:#e9e3cf;border-radius:99px;overflow:hidden;margin-top:10px;display:none}
+  .progress>i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--gold2),var(--gold));transition:width .25s}
+  .statuslog{font-size:13.5px;color:var(--muted);margin-top:9px;line-height:1.55;white-space:pre-wrap}
+  .statuslog .ok{color:#2c7a2c;font-weight:600}
+  .statuslog .err{color:#a52a3a;font-weight:600}
+  .cfggrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}
+  .emptynote{padding:16px 8px;text-align:center;color:var(--muted);font-size:14px}
 </style>
 </head>
 <body>
@@ -175,6 +200,75 @@
         <div class="gallery" id="gallery"></div>
       </div>
     </div>
+  </div>
+
+  <div class="panel fullpanel" id="bulkPanel">
+    <h2><span class="step">5</span>Bulk Certificates</h2>
+    <p class="hint" style="font-size:13.5px;margin-top:0">Running a large event? Import a whole list of recipients and generate a certificate for every person at once &mdash; using the <b>same category, design, logos, signature, event name and text</b> you set above. Everything is processed in your browser; your list never leaves your device.</p>
+
+    <label class="f">Step A &mdash; Import recipients</label>
+    <div class="seg" id="bulkTabs">
+      <button data-tab="sheet" class="active" type="button">&#128202; Excel / CSV file</button>
+      <button data-tab="photo" type="button">&#128247; Photo of a list</button>
+      <button data-tab="paste" type="button">&#128203; Paste a list</button>
+    </div>
+
+    <div id="tabSheet" style="margin-top:12px">
+      <div class="upload" id="sheetUpload">
+        <input type="file" id="inSheet" accept=".xlsx,.xls,.csv">
+        <div class="u-t">&#128202; Upload an Excel or CSV file</div>
+        <div class="u-s">The first sheet is read. A Name column (Name / Student / Participant) and an optional Email column are detected automatically.</div>
+      </div>
+    </div>
+
+    <div id="tabPhoto" style="margin-top:12px" hidden>
+      <div class="upload" id="photoUpload">
+        <input type="file" id="inPhoto" accept="image/*">
+        <div class="u-t">&#128247; Upload a photo of the list</div>
+        <div class="u-s">A clear photo of a printed or handwritten list works best. Text is recognised on your device (OCR) &mdash; you can fix any mistakes in the review table below.</div>
+      </div>
+      <div class="progress" id="ocrProgress"><i></i></div>
+      <div class="statuslog" id="ocrStatus"></div>
+    </div>
+
+    <div id="tabPaste" style="margin-top:12px" hidden>
+      <textarea id="inPaste" placeholder="One recipient per line. You may add an email after a comma, like this:&#10;Aarav Sharma, aarav@example.com&#10;Priya Patel&#10;Rahul Verma, rahul@example.com" style="min-height:110px"></textarea>
+      <button class="btn btn-ghost btn-sm" id="btnPasteImport" type="button">Import pasted list</button>
+    </div>
+
+    <div class="statuslog" id="importStatus"></div>
+
+    <label class="f">Step B &mdash; Review recipients (<span id="bulkCount">0</span>)</label>
+    <div class="tablewrap">
+      <table class="recip">
+        <thead><tr><th style="width:38px">#</th><th>Name</th><th style="width:32%">Email (optional)</th><th style="width:118px">Send</th><th style="width:46px"></th></tr></thead>
+        <tbody id="bulkBody"></tbody>
+      </table>
+      <div class="emptynote" id="bulkEmpty">No recipients yet &mdash; import a list using one of the options above.</div>
+    </div>
+    <div class="rowbtns">
+      <button class="btn btn-ghost btn-sm" id="btnAddRow" type="button">+ Add a row</button>
+      <button class="btn btn-ghost btn-sm" id="btnClearRows" type="button">Clear all</button>
+    </div>
+
+    <label class="f">Step C &mdash; Generate all certificates</label>
+    <button class="btn btn-navy" id="btnBulkZip" type="button">&#11015; Generate &amp; Download ZIP (all certificates)</button>
+    <div class="progress" id="zipProgress"><i></i></div>
+    <div class="statuslog" id="zipStatus"></div>
+
+    <label class="f">Step D &mdash; Email certificates (optional)</label>
+    <div class="hint" style="margin-top:0">Certificates can be emailed to each recipient through <b>EmailJS</b>, a free service that sends mail from your own email account. This is a one-time setup: create a free EmailJS account, connect your email service, and create a template with an attachment variable named <b>certificate_image</b> (the recipient address uses the template variable <b>to_email</b>). Paste your three keys below &mdash; they are stored only in this browser (localStorage), never on a server. If EmailJS is not set up, you can still use the per-person <b>Compose</b> buttons in the table above, which open your own mail app with the message pre-filled (attach that person&rsquo;s PNG from the downloaded ZIP).</div>
+    <div class="cfggrid" style="margin-top:10px">
+      <input type="text" id="cfgPubKey" placeholder="EmailJS Public Key">
+      <input type="text" id="cfgService" placeholder="EmailJS Service ID">
+      <input type="text" id="cfgTemplate" placeholder="EmailJS Template ID">
+    </div>
+    <div class="rowbtns">
+      <button class="btn btn-ghost btn-sm" id="btnSaveCfg" type="button">Save email settings</button>
+      <button class="btn btn-gold btn-sm" id="btnBulkEmail" type="button">&#9993; Send certificates by email</button>
+    </div>
+    <div class="progress" id="mailProgress"><i></i></div>
+    <div class="statuslog" id="mailStatus"></div>
   </div>
 
   <footer>
@@ -530,6 +624,348 @@ els.date.value = new Date().toISOString().slice(0,10);
 buildLogoSlots();
 if(document.fonts && document.fonts.ready){ document.fonts.ready.then(()=>{ buildGallery(); render(); }); }
 buildGallery(); render();
+</script>
+<script>
+"use strict";
+/* ============ BULK CERTIFICATES ============ */
+const bulk = { rows: [] }; /* rows: {name, email} */
+const B$ = id => document.getElementById(id);
+const EMAIL_RE = /[\w.+-]+@[\w-]+(\.[\w-]+)+/;
+
+function bulkSetStatus(el, msg, cls){
+  el.innerHTML = "";
+  if(!msg) return;
+  const span = document.createElement("span");
+  if(cls) span.className = cls;
+  span.textContent = msg;
+  el.appendChild(span);
+}
+function extractEmail(str){
+  const m = String(str || "").match(EMAIL_RE);
+  return m ? m[0].replace(/[.,;]+$/,"") : "";
+}
+function cleanName(str){
+  return String(str || "")
+    .replace(EMAIL_RE, " ")
+    .replace(/^[\s\u2022\-\*]+/, "")
+    .replace(/^\d{1,3}\s*[.)\]:\-]\s*/, "")
+    .replace(/[,;\t]+/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/^[:\-\s]+|[:\-\s]+$/g, "")
+    .trim();
+}
+function lineToRecipient(line){
+  let email = extractEmail(line);
+  let name = cleanName(line);
+  if(!name || name.length < 2 || !/[A-Za-z\u00C0-\u024F\u0900-\u097F]/.test(name)) return null;
+  if(/^(name|student|participant|recipient|candidate|roll|reg|serial|s\.?\s?no\.?|sr\.?\s?no\.?|class|section)\b/i.test(name) && !email) {
+    if(name.split(" ").length <= 2 || /\d/.test(name)) return null; /* leftover header / roll-number line */
+  }
+  return { name: name, email: email };
+}
+function addRecipients(list, sourceLabel){
+  let added = 0, dupes = 0;
+  const seen = new Set(bulk.rows.map(r => (r.name.toLowerCase() + "|" + r.email.toLowerCase())));
+  list.forEach(r => {
+    if(!r || !r.name) return;
+    const key = r.name.toLowerCase() + "|" + (r.email || "").toLowerCase();
+    if(seen.has(key)){ dupes++; return; }
+    seen.add(key); bulk.rows.push({ name: r.name, email: r.email || "" }); added++;
+  });
+  renderBulkTable();
+  const parts = [];
+  if(added) parts.push(added + " recipient" + (added === 1 ? "" : "s") + " added from " + sourceLabel + ".");
+  if(dupes) parts.push(dupes + " duplicate" + (dupes === 1 ? "" : "s") + " skipped.");
+  if(!added && !dupes) parts.push("No names could be found in " + sourceLabel + ". Please check the format and try again.");
+  bulkSetStatus(B$("importStatus"), parts.join(" "), added ? "ok" : "err");
+}
+
+/* ---------- import: Excel / CSV (SheetJS) ---------- */
+function parseSheetRows(grid){
+  const nameRe = /\b(name|student|participant|recipient|candidate|attendee|full\s?name)\b/i;
+  const mailRe = /e-?mail/i;
+  let headerRow = -1, nameCol = 0, mailCol = -1;
+  for(let r = 0; r < Math.min(grid.length, 15); r++){
+    const row = grid[r] || [];
+    let nc = -1, mc = -1;
+    row.forEach((cell, c) => {
+      const t = String(cell || "");
+      if(nc < 0 && nameRe.test(t)) nc = c;
+      if(mc < 0 && mailRe.test(t)) mc = c;
+    });
+    if(nc >= 0){ headerRow = r; nameCol = nc; mailCol = mc; break; }
+  }
+  if(mailCol < 0){ /* no header email column — look for any column containing emails */
+    outer:
+    for(let c = 0; c < 12; c++){
+      for(let r = 0; r < grid.length; r++){
+        if(extractEmail(String((grid[r] || [])[c] || ""))){ mailCol = c; break outer; }
+      }
+    }
+  }
+  const out = [];
+  const start = headerRow >= 0 ? headerRow + 1 : 0;
+  for(let r = start; r < grid.length; r++){
+    const row = grid[r] || [];
+    const rawName = String(row[nameCol] || "");
+    if(nameRe.test(rawName) && rawName.trim().length < 30 && headerRow < 0) continue;
+    let email = mailCol >= 0 ? extractEmail(String(row[mailCol] || "")) : "";
+    if(!email){ for(const cell of row){ const e = extractEmail(String(cell || "")); if(e){ email = e; break; } } }
+    const rec = lineToRecipient(rawName + (email ? " " + email : ""));
+    if(rec) out.push(rec);
+  }
+  return out;
+}
+const sheetBox = B$("sheetUpload"), sheetInput = B$("inSheet");
+sheetBox.addEventListener("click", e => { if(e.target !== sheetInput) sheetInput.click(); });
+sheetInput.addEventListener("change", async () => {
+  const file = sheetInput.files[0]; if(!file) return;
+  sheetInput.value = "";
+  if(!window.XLSX){ bulkSetStatus(B$("importStatus"), "The spreadsheet library could not be loaded. Please check your internet connection and reload the page.", "err"); return; }
+  bulkSetStatus(B$("importStatus"), "Reading " + file.name + " …");
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: "array" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const grid = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: false });
+    addRecipients(parseSheetRows(grid), file.name);
+  } catch(err){
+    bulkSetStatus(B$("importStatus"), "Could not read that file (" + err.message + "). Please upload a valid .xlsx, .xls or .csv file.", "err");
+  }
+});
+
+/* ---------- import: photo of a list (Tesseract.js OCR) ---------- */
+const photoBox = B$("photoUpload"), photoInput = B$("inPhoto");
+photoBox.addEventListener("click", e => { if(e.target !== photoInput) photoInput.click(); });
+photoInput.addEventListener("change", async () => {
+  const file = photoInput.files[0]; if(!file) return;
+  photoInput.value = "";
+  const bar = B$("ocrProgress"), fill = bar.querySelector("i"), st = B$("ocrStatus");
+  if(!window.Tesseract){ bulkSetStatus(st, "The OCR library could not be loaded. Please check your internet connection and reload the page.", "err"); return; }
+  bar.style.display = "block"; fill.style.width = "2%";
+  bulkSetStatus(st, "Recognising text in your photo — the first run downloads the OCR engine and can take a minute for a long list …");
+  let ocrWorker = null;
+  try {
+    ocrWorker = await Tesseract.createWorker("eng", undefined, {
+      workerPath: "https://unpkg.com/tesseract.js@5/dist/worker.min.js",
+      corePath: "https://unpkg.com/tesseract.js-core@5",
+      langPath: "https://unpkg.com/@tesseract.js-data/eng/4.0.0",
+      logger: m => {
+        if(m.status === "recognizing text"){
+          fill.style.width = Math.max(3, Math.round(m.progress * 100)) + "%";
+          bulkSetStatus(st, "Recognising text … " + Math.round(m.progress * 100) + "%");
+        } else if(m.status){
+          bulkSetStatus(st, "OCR: " + m.status + " …");
+        }
+      }
+    });
+    const res = await ocrWorker.recognize(file);
+    const lines = res.data.text.split(/\r?\n/);
+    const recips = lines.map(lineToRecipient).filter(Boolean);
+    fill.style.width = "100%";
+    addRecipients(recips, "the photo");
+    bulkSetStatus(st, "OCR finished. Please review the names in the table below and correct any recognition mistakes.", "ok");
+  } catch(err){
+    bulkSetStatus(st, "OCR failed (" + err.message + "). Try a clearer, straight photo with good light, or use the paste option.", "err");
+  } finally {
+    if(ocrWorker){ try { await ocrWorker.terminate(); } catch(e){} }
+    setTimeout(() => { bar.style.display = "none"; fill.style.width = "0"; }, 1200);
+  }
+});
+
+/* ---------- import: paste a list ---------- */
+B$("btnPasteImport").addEventListener("click", () => {
+  const text = B$("inPaste").value;
+  if(!text.trim()){ bulkSetStatus(B$("importStatus"), "The paste box is empty — paste one name per line first.", "err"); return; }
+  const recips = text.split(/\r?\n/).map(lineToRecipient).filter(Boolean);
+  addRecipients(recips, "the pasted list");
+  if(recips.length) B$("inPaste").value = "";
+});
+
+/* ---------- import tabs ---------- */
+B$("bulkTabs").addEventListener("click", e => {
+  const b = e.target.closest("button"); if(!b) return;
+  document.querySelectorAll("#bulkTabs button").forEach(x => x.classList.toggle("active", x === b));
+  B$("tabSheet").hidden = b.dataset.tab !== "sheet";
+  B$("tabPhoto").hidden = b.dataset.tab !== "photo";
+  B$("tabPaste").hidden = b.dataset.tab !== "paste";
+});
+
+/* ---------- review table ---------- */
+function mailtoHref(r){
+  const ev = els.event.value.trim();
+  const subject = encodeURIComponent("Your certificate" + (ev ? " — " + ev : ""));
+  const body = encodeURIComponent("Dear " + r.name + ",\n\nCongratulations! Please find your certificate attached to this email (attach the PNG file named after you from the downloaded ZIP).\n\nWarm regards,\n" + (els.signName.value.trim() || "The Organising Team"));
+  return "mailto:" + r.email + "?subject=" + subject + "&body=" + body;
+}
+function renderBulkTable(){
+  const tb = B$("bulkBody"); tb.innerHTML = "";
+  bulk.rows.forEach((r, i) => {
+    const tr = document.createElement("tr");
+    const tdN = document.createElement("td"); tdN.textContent = i + 1; tr.appendChild(tdN);
+    const tdName = document.createElement("td");
+    const inName = document.createElement("input"); inName.type = "text"; inName.value = r.name; inName.placeholder = "Recipient name";
+    inName.addEventListener("input", () => { bulk.rows[i].name = inName.value; updateBulkCount(); });
+    tdName.appendChild(inName); tr.appendChild(tdName);
+    const tdMail = document.createElement("td");
+    const inMail = document.createElement("input"); inMail.type = "email"; inMail.value = r.email; inMail.placeholder = "name@example.com";
+    inMail.addEventListener("input", () => { bulk.rows[i].email = inMail.value.trim(); refreshMailto(tr, bulk.rows[i]); });
+    tdMail.appendChild(inMail); tr.appendChild(tdMail);
+    const tdSend = document.createElement("td"); tdSend.className = "sendcell"; tr.appendChild(tdSend);
+    const tdDel = document.createElement("td");
+    const del = document.createElement("button"); del.type = "button"; del.className = "iconbtn danger"; del.textContent = "✕"; del.title = "Remove this recipient";
+    del.addEventListener("click", () => { bulk.rows.splice(i, 1); renderBulkTable(); });
+    tdDel.appendChild(del); tr.appendChild(tdDel);
+    refreshMailto(tr, r);
+    tb.appendChild(tr);
+  });
+  B$("bulkEmpty").style.display = bulk.rows.length ? "none" : "block";
+  updateBulkCount();
+}
+function refreshMailto(tr, r){
+  const cell = tr.querySelector(".sendcell"); if(!cell) return;
+  cell.innerHTML = "";
+  if(r.email && EMAIL_RE.test(r.email)){
+    const a = document.createElement("a");
+    a.className = "iconbtn"; a.textContent = "✉ Compose"; a.href = mailtoHref(r); a.title = "Open your mail app with a pre-filled message to this recipient";
+    cell.appendChild(a);
+  }
+}
+function updateBulkCount(){
+  const n = bulk.rows.filter(r => r.name.trim()).length;
+  B$("bulkCount").textContent = n;
+  B$("btnBulkZip").textContent = "⬇ Generate & Download ZIP (" + n + " certificate" + (n === 1 ? "" : "s") + ")";
+}
+B$("btnAddRow").addEventListener("click", () => { bulk.rows.push({ name: "", email: "" }); renderBulkTable(); });
+B$("btnClearRows").addEventListener("click", () => { bulk.rows = []; renderBulkTable(); bulkSetStatus(B$("importStatus"), ""); });
+
+/* ---------- generate ZIP ---------- */
+function slugName(name, idx){
+  const s = name.trim().replace(/[^\w\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+  return s || ("recipient-" + (idx + 1));
+}
+function canvasBlob(cv, type){
+  return new Promise(res => cv.toBlob(b => res(b), type || "image/png"));
+}
+async function renderForRecipient(name, w, h, type){
+  const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+  els.name.value = name;
+  drawCert(cv.getContext("2d"), w, h, true);
+  return cv;
+}
+B$("btnBulkZip").addEventListener("click", async () => {
+  const list = bulk.rows.filter(r => r.name.trim());
+  const st = B$("zipStatus"), bar = B$("zipProgress"), fill = bar.querySelector("i");
+  if(!list.length){ bulkSetStatus(st, "Add at least one recipient first (Step A and B above).", "err"); return; }
+  if(!window.JSZip){ bulkSetStatus(st, "The ZIP library could not be loaded. Please check your internet connection and reload the page.", "err"); return; }
+  const btn = B$("btnBulkZip"); btn.disabled = true; btn.style.opacity = .6;
+  bar.style.display = "block"; fill.style.width = "0%";
+  const originalName = els.name.value;
+  try {
+    const zip = new JSZip();
+    const used = {};
+    for(let i = 0; i < list.length; i++){
+      bulkSetStatus(st, "Generating certificate " + (i + 1) + " of " + list.length + " — " + list[i].name + " …");
+      fill.style.width = Math.round((i / list.length) * 85) + "%";
+      const cv = await renderForRecipient(list[i].name, 1400, 990, "image/png");
+      const blob = await canvasBlob(cv, "image/png");
+      let base = slugName(list[i].name, i);
+      if(used[base]){ used[base]++; base = base + "-" + used[base]; } else used[base] = 1;
+      zip.file(base + ".png", blob);
+      if(i % 5 === 4) await new Promise(r => setTimeout(r, 0));
+    }
+    bulkSetStatus(st, "Packing " + list.length + " certificates into a ZIP file …");
+    const zipBlob = await zip.generateAsync({ type: "blob", compression: "STORE" }, meta => {
+      fill.style.width = (85 + Math.round(meta.percent * 0.15)) + "%";
+    });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(zipBlob);
+    a.download = "certificates-" + CATEGORIES[state.cat].id + "-bulk-" + list.length + ".zip";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    fill.style.width = "100%";
+    bulkSetStatus(st, "Done — " + list.length + " certificates downloaded in one ZIP. Each file is named after its recipient.", "ok");
+  } catch(err){
+    bulkSetStatus(st, "Something went wrong while generating (" + err.message + "). Please try again.", "err");
+  } finally {
+    els.name.value = originalName; render();
+    btn.disabled = false; btn.style.opacity = 1;
+    setTimeout(() => { bar.style.display = "none"; fill.style.width = "0"; }, 1500);
+  }
+});
+
+/* ---------- EmailJS (optional, organiser's own keys) ---------- */
+const CFG_KEY = "certgen_emailjs_v1";
+function loadCfg(){
+  try { return JSON.parse(localStorage.getItem(CFG_KEY) || "{}"); } catch(e){ return {}; }
+}
+function fillCfg(){
+  const c = loadCfg();
+  B$("cfgPubKey").value = c.publicKey || "";
+  B$("cfgService").value = c.serviceId || "";
+  B$("cfgTemplate").value = c.templateId || "";
+}
+fillCfg();
+B$("btnSaveCfg").addEventListener("click", () => {
+  const c = {
+    publicKey: B$("cfgPubKey").value.trim(),
+    serviceId: B$("cfgService").value.trim(),
+    templateId: B$("cfgTemplate").value.trim()
+  };
+  localStorage.setItem(CFG_KEY, JSON.stringify(c));
+  bulkSetStatus(B$("mailStatus"), (c.publicKey && c.serviceId && c.templateId)
+    ? "Email settings saved in this browser. You can now send certificates by email."
+    : "Saved — note that all three fields (Public Key, Service ID, Template ID) are needed before sending works.", "ok");
+});
+B$("btnBulkEmail").addEventListener("click", async () => {
+  const st = B$("mailStatus"), bar = B$("mailProgress"), fill = bar.querySelector("i");
+  const c = loadCfg();
+  if(!c.publicKey || !c.serviceId || !c.templateId){
+    bulkSetStatus(st, "Direct sending needs the free one-time EmailJS setup first: fill in your EmailJS Public Key, Service ID and Template ID above and press \u201CSave email settings\u201D. Until then, use the per-person Compose buttons in the table — they open your own mail app with the message ready.", "err");
+    return;
+  }
+  if(!window.emailjs){ bulkSetStatus(st, "The EmailJS library could not be loaded. Please check your internet connection and reload the page.", "err"); return; }
+  const list = bulk.rows.filter(r => r.name.trim() && EMAIL_RE.test(r.email || ""));
+  if(!list.length){ bulkSetStatus(st, "No recipients with a valid email address. Add emails in the review table first.", "err"); return; }
+  const btn = B$("btnBulkEmail"); btn.disabled = true; btn.style.opacity = .6;
+  bar.style.display = "block"; fill.style.width = "0%";
+  const originalName = els.name.value;
+  let sent = 0; const failures = [];
+  try {
+    emailjs.init({ publicKey: c.publicKey });
+    for(let i = 0; i < list.length; i++){
+      bulkSetStatus(st, "Emailing certificate " + (i + 1) + " of " + list.length + " — " + list[i].name + " <" + list[i].email + "> …");
+      fill.style.width = Math.round((i / list.length) * 100) + "%";
+      try {
+        const cv = await renderForRecipient(list[i].name, 1000, 707, "image/jpeg");
+        const dataUrl = cv.toDataURL("image/jpeg", 0.88);
+        await emailjs.send(c.serviceId, c.templateId, {
+          to_email: list[i].email,
+          to_name: list[i].name,
+          recipient_name: list[i].name,
+          event_name: els.event.value.trim(),
+          from_name: els.signName.value.trim(),
+          certificate_image: dataUrl
+        });
+        sent++;
+      } catch(err){
+        failures.push(list[i].name + " (" + (err && err.text ? err.text : (err && err.message) || "send failed") + ")");
+      }
+      if(i < list.length - 1) await new Promise(r => setTimeout(r, 350));
+    }
+    fill.style.width = "100%";
+    let msg = "Email run finished: " + sent + " of " + list.length + " certificates sent.";
+    if(failures.length) msg += "\nCould not send to: " + failures.join("; ") + ".\nTip: for those people, use the Compose button and attach their PNG from the ZIP.";
+    bulkSetStatus(st, msg, failures.length ? "err" : "ok");
+  } finally {
+    els.name.value = originalName; render();
+    btn.disabled = false; btn.style.opacity = 1;
+    setTimeout(() => { bar.style.display = "none"; fill.style.width = "0"; }, 1500);
+  }
+});
+
+/* bulk init */
+renderBulkTable();
 </script>
 </body>
 </html>
