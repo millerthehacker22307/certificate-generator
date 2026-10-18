@@ -12,7 +12,16 @@ A free, browser-based certificate maker with a design engine that produces
 - Design engine: 8 colour palettes x 6 frames x 4 layouts x 5 fonts x 4 textures,
   with a live design count, a variant gallery and a "Surprise Me" randomiser
   that never repeats the current design
-- Signature photo upload, placed above the signatory line
+- Signature photo upload, placed above the signatory line; every signature can
+  be removed again with one click
+- Automatic paper-background removal for signature photos: only the ink strokes
+  are kept (the white/paper background becomes transparent), with a toggle and a
+  sensitivity slider; works for black and coloured pens
+- Signatures are fully optional: 0, 1, 2 or 3 signatories; a signatory slot with
+  no photo and no name prints nothing on the certificate
+- Full-cover background image upload: covers the entire certificate edge to
+  edge behind the frame and text, with a "fade for readability" slider and a
+  remove button
 - Position / rank: Participation, 1st, 2nd or 3rd Position presets, or a fully
   custom label (e.g. "Winner", "Best Performer"), shown as a ribbon under the
   recipient's name
@@ -27,7 +36,8 @@ A free, browser-based certificate maker with a design engine that produces
 
 ## Bulk Certificates
 For large events, the Bulk Certificates section generates one certificate per
-recipient using the same category, design, logos, watermark and signatures:
+recipient using the same category, design, logos, background image, watermark
+and signatures:
 - Import recipients from an Excel/CSV file (SheetJS; Name and Email columns
   auto-detected, plus optional Position and Message columns that apply to that
   recipient only), from a photo of a printed/handwritten list (Tesseract.js OCR),
